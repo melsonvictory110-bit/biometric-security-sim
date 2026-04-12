@@ -1,5 +1,5 @@
 flask
 opencv-python-headless
-cvzone
-mediapipe
+cvzone==1.5.6
+mediapipe==0.10.11
 gunicorn
