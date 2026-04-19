@@ -59,7 +59,7 @@ def process_frame():
         print(f"Server Error: {e}")
         return jsonify({"status": "SYSTEM ERROR", "authenticated": False})
 
-if name == '__main__':
+if __name__ == '__main__':
     # 'PORT' is set by Render automatically; default to 5000 for local testing
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
