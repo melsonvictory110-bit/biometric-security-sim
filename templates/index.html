@@ -1,63 +1,44 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Biometric Scanner</title>
-    <style>
-        body { background: #0a0a0a; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .phone-frame { width: 300px; height: 600px; border: 8px solid #333; border-radius: 40px; position: relative; background: #000; overflow: hidden; box-shadow: 0 0 50px rgba(0, 255, 0, 0.1); }
-        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
-        .scan-line { position: absolute; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.8); top: 0; animation: scan 3s infinite linear; box-shadow: 0 0 15px #00ff00; }
-        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
-        .status-box { position: absolute; bottom: 40px; width: 100%; text-align: center; background: rgba(0,0,0,0.7); padding: 10px 0; border-top: 1px solid #00ff00; }
-        .blink { animation: blinker 1s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0; } }
-    </style>
-</head>
-<body>
-    <div class="phone-frame">
-        <video id="webcam" autoplay playsinline></video>
-        <div class="scan-line"></div>
-        <div class="status-box">
-            <p id="status-text" class="blink">INITIALIZING...</p>
-        </div>
-    </div>
+import cv2
+import base64
+import numpy as np
+import mediapipe as mp
+from flask import Flask, request, jsonify, render_template
+import os
 
-    <script>
-        const video = document.getElementById('webcam');
-        const statusText = document.getElementById('status-text');
+app = Flask(__name__)
 
-        // Access the mobile/laptop camera
-        if (navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function (stream) {
-                    video.srcObject = stream;
-                })
-                .catch(function (error) {
-                    statusText.innerText = "CAMERA ERROR";
-                });
-        }
+# Setup MediaPipe Face Detection
+mp_face_detection = mp.solutions.face_detection
+face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
 
-        // Send frames to Python every 2 seconds
-        setInterval(() => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const data = canvas.toDataURL('image/jpeg');
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-            fetch('/process_frame', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: data })
-            })
-            .then(res => res.json())
-            .then(data => {
-                statusText.innerText = data.status;
-                statusText.style.color = data.authenticated ? "#00ff00" : "#ff0000";
-            });
-        }, 2000);
-    </script>
-</body>
-</html>
+@app.route('/process_frame', methods=['POST'])
+def process_frame():
+    try:
+        # Get the image from the browser
+        data = request.json['image']
+        header, encoded = data.split(",", 1)
+        nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # AI Detection
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = face_detection.process(img_rgb)
+
+        if results.detections:
+            status = "ACCESS GRANTED"
+            auth = True
+        else:
+            status = "SCANNING..."
+            auth = False
+
+        return jsonify({"status": status, "authenticated": auth})
+    except Exception as e:
+        return jsonify({"status": "SYSTEM ERROR", "authenticated": False})
+
+if __name__== '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
