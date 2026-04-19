@@ -1,44 +1,183 @@
-import cv2
-import base64
-import numpy as np
-import mediapipe as mp
-from flask import Flask, request, jsonify, render_template
-import os
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECURE TERMINAL v1.0</title>
+    <style>
+        :root {
+            --neon-green: #00ff41;
+            --dark-bg: #050505;
+            --glass: rgba(0, 255, 65, 0.1);
+        }
 
-app = Flask(__name__)
+        body {
+            background-color: var(--dark-bg);
+            color: var(--neon-green);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-transform: uppercase;
+        }
 
-# Setup MediaPipe Face Detection
-mp_face_detection = mp.solutions.face_detection
-face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+        h1 {
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+        .phone-container {
+            width: 320px;
+            height: 600px;
+            border: 2px solid var(--neon-green);
+            border-radius: 40px;
+            position: relative;
+            background: #000;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+        }
 
-@app.route('/process_frame', methods=['POST'])
-def process_frame():
-    try:
-        # Get the image from the browser
-        data = request.json['image']
-        header, encoded = data.split(",", 1)
-        nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        /* Camera Feed */
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(100%) brightness(80%) contrast(120%);
+        }
 
-        # AI Detection
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = face_detection.process(img_rgb)
+        /* The Animated Scan Line */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--neon-green);
+            box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
+            z-index: 10;
+            animation: moveScan 3s infinite ease-in-out;
+        }
 
-        if results.detections:
-            status = "ACCESS GRANTED"
-            auth = True
-        else:
-            status = "SCANNING..."
-            auth = False
+        @keyframes moveScan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
 
-        return jsonify({"status": status, "authenticated": auth})
-    except Exception as e:
-        return jsonify({"status": "SYSTEM ERROR", "authenticated": False})
+        /* Overlay UI Elements */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            border-radius: 40px;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1) 0px,
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+        }
 
-if __name__== '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+        .status-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--neon-green);
+            padding: 15px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+            border-radius: 5px;
+        }
+
+        .corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--neon-green);
+        }
+        .top-left { top: 20px; left: 20px; border-right: 0; border-bottom: 0; }
+        .top-right { top: 20px; right: 20px; border-left: 0; border-bottom: 0; }
+        .bottom-left { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
+        .bottom-right { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
+
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <h1>SECURITY TERMINAL v1.04</h1>
+
+    <div class="phone-container">
+        <video id="webcam" autoplay playsinline></video>
+        <div class="scan-line"></div>
+        <div class="overlay"></div>
+        
+        <div class="corner top-left"></div>
+        <div class="corner top-right"></div>
+        <div class="corner bottom-left"></div>
+        <div class="corner bottom-right"></div>
+
+        <div class="status-panel">
+            <div style="font-size: 0.7rem; margin-bottom: 5px;">SYSTEM STATUS:</div>
+            <div id="status-text" class="blink">SCANNING BIOMETRICS...</div>
+        </div>
+    </div>
+
+Melson Victory, [19/04/2026 15:15]
+<script>
+        const video = document.getElementById('webcam');
+        const statusText = document.getElementById('status-text');
+
+        // Start Camera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { statusText.innerText = "CAMERA ERROR"; });
+
+        // Backend Communication Loop
+        async function process() {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const base64Image = canvas.toDataURL('image/jpeg');
+
+            try {
+                const response = await fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Image })
+                });
+                const data = await response.json();
+                
+                statusText.innerText = data.status;
+                
+                if (data.authenticated) {
+                    statusText.style.color = "#00ff41";
+                    statusText.classList.remove('blink');
+                } else {
+                    statusText.style.color = "#ff0000";
+                    statusText.classList.add('blink');
+                }
+            } catch (e) {
+                console.error("Link to app.py failed.");
+            }
+        }
+
+        setInterval(process, 1500); // Analyze every 1.5 seconds
+    </script>
+</body>
+</html>
