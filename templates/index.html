@@ -3,64 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SECURE TERMINAL v1.0</title>
+    <title>BIOMETRIC AUTHENTICATOR</title>
     <style>
         :root {
             --neon-green: #00ff41;
-            --dark-bg: #050505;
-            --glass: rgba(0, 255, 65, 0.1);
+            --alert-red: #ff0000;
         }
 
+        /* The white background helps reflect light onto your face */
         body {
-            background-color: var(--dark-bg);
-            color: var(--neon-green);
-            font-family: 'Courier New', Courier, monospace;
+            background-color: #ffffff; 
+            color: #000;
+            font-family: 'Courier New', monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            text-transform: uppercase;
+            overflow: hidden;
         }
 
-        h1 {
-            font-size: 1.2rem;
-            letter-spacing: 3px;
-            margin-bottom: 20px;
-            text-shadow: 0 0 10px var(--neon-green);
+        .header-text {
+            margin-bottom: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
         }
 
         .phone-container {
             width: 320px;
-            height: 600px;
-            border: 2px solid var(--neon-green);
+            height: 580px;
+            border: 8px solid #111;
             border-radius: 40px;
             position: relative;
             background: #000;
             overflow: hidden;
-            box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
         }
 
-        /* Camera Feed */
         video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: grayscale(100%) brightness(80%) contrast(120%);
+            opacity: 0.8;
+            filter: contrast(110%);
         }
 
-        /* The Animated Scan Line */
         .scan-line {
             position: absolute;
             top: 0;
-            left: 0;
             width: 100%;
-            height: 4px;
+            height: 3px;
             background: var(--neon-green);
-            box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
-            z-index: 10;
-            animation: moveScan 3s infinite ease-in-out;
+            box-shadow: 0 0 15px var(--neon-green);
+            z-index: 5;
+            animation: moveScan 2.5s infinite ease-in-out;
         }
 
         @keyframes moveScan {
@@ -69,91 +66,60 @@
             100% { top: 0; }
         }
 
-        /* Overlay UI Elements */
-        .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            border-radius: 40px;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 0, 0, 0.1) 0px,
-                rgba(0, 0, 0, 0.1) 1px,
-                transparent 1px,
-                transparent 2px
-            );
-        }
-
         .status-panel {
             position: absolute;
-            bottom: 30px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
-            width: 80%;
-            background: rgba(0, 0, 0, 0.8);
+            width: 85%;
+            background: rgba(0, 0, 0, 0.9);
             border: 1px solid var(--neon-green);
-            padding: 15px;
+            padding: 12px;
             text-align: center;
-            backdrop-filter: blur(5px);
-            border-radius: 5px;
+            border-radius: 4px;
         }
 
-        .corner {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--neon-green);
+        #status-text {
+            color: var(--neon-green);
+            font-size: 0.9rem;
+            font-weight: bold;
         }
-        .top-left { top: 20px; left: 20px; border-right: 0; border-bottom: 0; }
-        .top-right { top: 20px; right: 20px; border-left: 0; border-bottom: 0; }
-        .bottom-left { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
-        .bottom-right { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
 
         .blink { animation: blinker 1s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
-
     </style>
 </head>
 <body>
 
-    <h1>SECURITY TERMINAL v1.04</h1>
+    <div class="header-text">SYSTEM IDENTIFICATION v2.0</div>
 
     <div class="phone-container">
         <video id="webcam" autoplay playsinline></video>
         <div class="scan-line"></div>
-        <div class="overlay"></div>
         
-        <div class="corner top-left"></div>
-        <div class="corner top-right"></div>
-        <div class="corner bottom-left"></div>
-        <div class="corner bottom-right"></div>
-
         <div class="status-panel">
-            <div style="font-size: 0.7rem; margin-bottom: 5px;">SYSTEM STATUS:</div>
-            <div id="status-text" class="blink">SCANNING BIOMETRICS...</div>
+            <div style="font-size: 0.6rem; color: #888; margin-bottom: 4px;">BIOMETRIC STATUS:</div>
+            <div id="status-text" class="blink">WAITING FOR SENSOR...</div>
         </div>
     </div>
 
-Melson Victory, [19/04/2026 15:15]
-<script>
+    <script>
         const video = document.getElementById('webcam');
         const statusText = document.getElementById('status-text');
 
-        // Start Camera
+        // Access Camera
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
             .then(stream => { video.srcObject = stream; })
-            .catch(err => { statusText.innerText = "CAMERA ERROR"; });
+            .catch(err => { statusText.innerText = "CAMERA BLOCKED"; });
 
-        // Backend Communication Loop
-        async function process() {
+        async function performScan() {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const base64Image = canvas.toDataURL('image/jpeg');
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            const base64Image = canvas.toDataURL('image/jpeg', 0.5); // 0.5 compresses for faster speed
 
             try {
                 const response = await fetch('/process_frame', {
@@ -161,23 +127,29 @@ Melson Victory, [19/04/2026 15:15]
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: base64Image })
                 });
+                
                 const data = await response.json();
-                
                 statusText.innerText = data.status;
-                
+
                 if (data.authenticated) {
-                    statusText.style.color = "#00ff41";
+                    statusText.style.
+
+color = "#00ff41";
                     statusText.classList.remove('blink');
+                    // Add a glow to the container if successful
+                    document.querySelector('.phone-container').style.borderColor = "#00ff41";
                 } else {
                     statusText.style.color = "#ff0000";
                     statusText.classList.add('blink');
+                    document.querySelector('.phone-container').style.borderColor = "#111";
                 }
-            } catch (e) {
-                console.error("Link to app.py failed.");
+            } catch (error) {
+                statusText.innerText = "LINK ERROR";
             }
         }
 
-        setInterval(process, 1500); // Analyze every 1.5 seconds
+        // Run the scan every 1 second
+        setInterval(performScan, 1000);
     </script>
 </body>
 </html>
