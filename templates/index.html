@@ -104,52 +104,43 @@
     </div>
 
     <script>
-        const video = document.getElementById('webcam');
-        const statusText = document.getElementById('status-text');
+      let verified = false; // Track if we are done
 
-        // Access Camera
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { statusText.innerText = "CAMERA BLOCKED"; });
+async function performScan() {
+    if (verified) return; // Stop sending data if already verified
 
-        async function performScan() {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
-            const base64Image = canvas.toDataURL('image/jpeg', 0.5); // 0.5 compresses for faster speed
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const base64Image = canvas.toDataURL('image/jpeg', 0.5);
 
-            try {
-                const response = await fetch('/process_frame', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64Image })
-                });
-                
-                const data = await response.json();
-                statusText.innerText = data.status;
-
-                if (data.authenticated) {
-                    statusText.style.
-
-color = "#00ff41";
-                    statusText.classList.remove('blink');
-                    // Add a glow to the container if successful
-                    document.querySelector('.phone-container').style.borderColor = "#00ff41";
-                } else {
-                    statusText.style.color = "#ff0000";
-                    statusText.classList.add('blink');
-                    document.querySelector('.phone-container').style.borderColor = "#111";
-                }
-            } catch (error) {
-                statusText.innerText = "LINK ERROR";
-            }
+    try {
+        const response = await fetch('/process_frame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64Image })
+        });
+        
+        const data = await response.json();
+        
+        if (data.authenticated) {
+            verified = true; // Lock the system
+            statusText.innerText = data.status;
+            statusText.style.color = "#00ff41";
+            document.querySelector('.scan-line').style.display = 'none'; // Stop the line
+            document.querySelector('.phone-container').style.borderColor = "#00ff41";
+            document.querySelector('.phone-container').style.boxShadow = "0 0 50px #00ff41";
+        } else {
+            statusText.innerText = data.status;
+            statusText.style.color = "#ff0000";
         }
+    } catch (error) {
+        statusText.innerText = "LINK ERROR";
+    }
+}
 
-        // Run the scan every 1 second
-        setInterval(performScan, 1000);
+setInterval(performScan, 1000); 
     </script>
 </body>
 </html>
