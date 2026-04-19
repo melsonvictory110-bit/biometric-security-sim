@@ -2,74 +2,62 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Biometric Security Sim</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biometric Scanner</title>
     <style>
-        body {
-            background-color: #0a0a0a;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
-
-        .monitor-frame {
-            border: 4px solid #00ff00;
-            padding: 10px;
-            background: #000;
-            box-shadow: 0 0 20px #00ff00;
-            position: relative;
-        }
-
-        .camera-feed {
-            width: 640px;
-            height: 480px;
-            display: block;
-            border: 1px solid #333;
-        }
-
-        .scan-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: rgba(0, 255, 0, 0.6);
-            box-shadow: 0 0 10px #00ff00;
-            animation: scanning 3s linear infinite;
-        }
-
-        @keyframes scanning {
-            0% { top: 0%; }
-            100% { top: 100%; }
-        }
-
-        .overlay-text {
-            margin-top: 20px;
-            text-align: center;
-            letter-spacing: 2px;
-            text-shadow: 0 0 5px #00ff00;
-        }
-
+        body { background: #0a0a0a; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .phone-frame { width: 300px; height: 600px; border: 8px solid #333; border-radius: 40px; position: relative; background: #000; overflow: hidden; box-shadow: 0 0 50px rgba(0, 255, 0, 0.1); }
+        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
+        .scan-line { position: absolute; width: 100%; height: 2px; background: rgba(0, 255, 0, 0.8); top: 0; animation: scan 3s infinite linear; box-shadow: 0 0 15px #00ff00; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        .status-box { position: absolute; bottom: 40px; width: 100%; text-align: center; background: rgba(0,0,0,0.7); padding: 10px 0; border-top: 1px solid #00ff00; }
         .blink { animation: blinker 1s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
-
-    <h1>SECURITY TERMINAL v1.0</h1>
-    
-    <div class="monitor-frame">
+    <div class="phone-frame">
+        <video id="webcam" autoplay playsinline></video>
         <div class="scan-line"></div>
-        <img src="{{ url_for('video_feed') }}" class="camera-feed">
+        <div class="status-box">
+            <p id="status-text" class="blink">INITIALIZING...</p>
+        </div>
     </div>
 
-    <div class="overlay-text">
-        <p>STATUS: <span class="blink">SCANNING BIOMETRICS...</span></p>
-    </div>
+    <script>
+        const video = document.getElementById('webcam');
+        const statusText = document.getElementById('status-text');
 
+        // Access the mobile/laptop camera
+        if (navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                })
+                .catch(function (error) {
+                    statusText.innerText = "CAMERA ERROR";
+                });
+        }
+
+        // Send frames to Python every 2 seconds
+        setInterval(() => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const data = canvas.toDataURL('image/jpeg');
+
+            fetch('/process_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: data })
+            })
+            .then(res => res.json())
+            .then(data => {
+                statusText.innerText = data.status;
+                statusText.style.color = data.authenticated ? "#00ff00" : "#ff0000";
+            });
+        }, 2000);
+    </script>
 </body>
 </html>
