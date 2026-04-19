@@ -3,146 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BIOMETRIC AUTHENTICATOR</title>
+    <title>SECURE SCAN</title>
     <style>
-        :root {
-            --neon-green: #00ff41;
-            --alert-red: #ff0000;
-        }
-
-        /* White background acts as a ring-light for your face */
-        body {
-            background-color: #ffffff; 
-            color: #000;
-            font-family: 'Courier New', monospace;
-            display: flex;
+        /* White background for face illumination */
+        body { 
+            background: #ffffff; 
+            display: flex; 
             flex-direction: column;
-            align-items: center;
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .terminal-box { 
+            width: 280px; 
+            height: 400px; 
+            background: #000000; 
+            border-radius: 25px; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
             justify-content: center;
-            height: 100vh;
-            margin: 0;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
             overflow: hidden;
         }
 
-        .phone-container {
-            width: 320px;
-            height: 580px;
-            border: 8px solid #111;
-            border-radius: 40px;
-            position: relative;
-            background: #000;
-            overflow: hidden;
-            transition: all 0.5s ease;
+        /* The Scan Line */
+        .scanner-line { 
+            position: absolute; 
+            width: 100%; 
+            height: 3px; 
+            background: #00ff41; 
+            box-shadow: 0 0 15px #00ff41;
+            top: 0; 
+            animation: move 2.5s infinite linear; 
         }
 
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.8;
-        }
-
-        .scan-line {
-            position: absolute;
-            top: 0;
-            width: 100%;
-            height: 4px;
-            background: var(--neon-green);
-            box-shadow: 0 0 15px var(--neon-green);
-            z-index: 5;
-            animation: moveScan 2.5s infinite ease-in-out;
-        }
-
-        @keyframes moveScan {
+        @keyframes move {
             0% { top: 0; }
-            50% { top: 100%; }
-            100% { top: 0; }
+            100% { top: 100%; }
         }
 
-        .status-panel {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 85%;
-            background: rgba(0, 0, 0, 0.9);
-            border: 1px solid var(--neon-green);
-            padding: 12px;
+        .status-container {
             text-align: center;
-            border-radius: 4px;
+            z-index: 10;
+            padding: 20px;
         }
 
-        #status-text {
-            color: var(--neon-green);
-            font-size: 0.8rem;
-            font-weight: bold;
+        #status-msg {
+            color: #00ff41;
+            font-family: monospace;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
             text-transform: uppercase;
         }
 
-        .blink { animation: blinker 1s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0; } }
+        /* Success Icon - hidden until verified */
+        #success-icon {
+            display: none;
+            width: 60px;
+            height: 60px;
+            border: 3px solid #00ff41;
+            border-radius: 50%;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        #success-icon::after {
+            content: '✓';
+            color: #00ff41;
+            font-size: 40px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Hidden Camera */
+        video { display: none; }
     </style>
 </head>
 <body>
 
-    <div style="margin-bottom: 10px; font-weight: bold;">SECURITY TERMINAL </div>
+    <div style="margin-bottom: 20px; font-weight: bold; color: #333;">BIOMETRIC ACCESS CONTROL</div>
 
-    <div class="phone-container">
+    <div class="terminal-box">
         <video id="webcam" autoplay playsinline></video>
-        <div id="scanner" class="scan-line"></div>
+        <div id="line" class="scanner-line"></div>
         
-        <div class="status-panel">
-            <div id="status-text" class="blink">SCANNING BIOMETRICS...</div>
+        <div class="status-container">
+            <div id="success-icon"></div>
+            <div id="status-msg">ANALYZING BIOMETRICS...</div>
         </div>
     </div>
 
     <script>
         const video = document.getElementById('webcam');
-        const statusText = document.getElementById('status-text');
-        const scanLine = document.getElementById('scanner');
-        const container = document.querySelector('.phone-container');
-        let isVerified = false;
+        const statusMsg = document.getElementById('status-msg');
+        const line = document.getElementById('line');
+        const icon = document.getElementById('success-icon');
+        let verified = false;
 
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { statusText.innerText = "CAMERA ERROR"; });
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(s => video.srcObject = s);
 
-        async function performScan() {
-            if (isVerified) return;
+        async function process() {
+            if (verified) return;
 
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
-            const base64Image = canvas.toDataURL('image/jpeg', 0.5);
+            const image = canvas.toDataURL('image/jpeg', 0.5);
 
             try {
-                const response = await fetch('/process_frame', {
+                const res = await fetch('/process_frame', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64Image })
+                    body: JSON.stringify({ image })
                 });
-                
-                const data = await response.json();
-                statusText.innerText = data.status;
+                const data = await res.json();
 
                 if (data.authenticated) {
-                    isVerified = true;
-                    statusText.style.color = "#00ff41";
-                    statusText.classList.remove('blink');
+                    verified = true;
+                    statusMsg.innerText = "VERIFICATION COMPLETED";
+                    line.style.display = 'none';
+                    icon.style.display = 'block';
+                    document.querySelector('.terminal-box').
 
-scanLine.style.display = 'none'; // Stop scanning line
-                    container.style.borderColor = "#00ff41";
-                    container.style.boxShadow = "0 0 40px rgba(0, 255, 65, 0.4)";
+style.borderColor = "#00ff41";
                 } else {
-                    statusText.style.color = "#ff0000";
+                    statusMsg.innerText = "SCANNING FOR HUMAN...";
                 }
-            } catch (error) {
-                statusText.innerText = "LINK ERROR";
+            } catch (e) {
+                statusMsg.innerText = "SENSOR OFFLINE";
             }
         }
 
-        setInterval(performScan, 1000);
+        setInterval(process, 1200);
     </script>
 </body>
 </html>
